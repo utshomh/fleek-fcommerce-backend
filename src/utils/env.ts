@@ -11,7 +11,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string(),
 
   ACCESS_TOKEN_EXPIRES: z.string(),
-  JWT_ACCESS_SECRET: z.string(),
+  REFRESH_TOKEN_EXPIRES: z.string(),
+  JWT_SECRET: z.string(),
 });
 
 const env = envSchema.parse(process.env);

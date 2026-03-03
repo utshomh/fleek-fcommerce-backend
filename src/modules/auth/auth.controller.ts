@@ -1,15 +1,18 @@
+import ms from "ms";
 import { Request, Response } from "express";
 
+import env from "../../utils/env";
 import prisma from "../../lib/prisma";
 import {
   hashPassword,
   comparePassword,
   generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
 } from "../../utils/auth";
-import env from "../../utils/env";
 
 export const signUp = async (req: Request, res: Response) => {
-  const { name, email, password } = req.body;
+  const { name, email, phone, password } = req.body;
   try {
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing)
@@ -23,6 +26,7 @@ export const signUp = async (req: Request, res: Response) => {
       data: {
         name,
         email,
+        phone,
         password: hashed,
         photoUrl: `https://ui-avatars.com/api/?name=${name}`,
       },
@@ -51,7 +55,87 @@ export const signIn = async (req: Request, res: Response) => {
 
     const accessToken = await generateAccessToken(user.id);
 
-    res.json({ success: true, accessToken });
+    const refreshToken = await generateRefreshToken(user.id);
+    const expiresAt = new Date();
+    expiresAt.setDate(
+      expiresAt.getDate() + parseInt(env.REFRESH_TOKEN_EXPIRES),
+    );
+
+    await prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId: user.id,
+        expiresAt,
+      },
+    });
+
+    const refreshTokenMaxAge = parseInt(
+      ms(parseInt(env.REFRESH_TOKEN_EXPIRES)),
+    );
+
+    res
+      .cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        maxAge: refreshTokenMaxAge,
+      })
+      .json({ success: true, accessToken });
+  } catch (err) {
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
+  }
+};
+
+export const refresh = async (req: Request, res: Response) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken) {
+    return res.status(401).json({ message: "No refresh token" });
+  }
+
+  try {
+    const existingToken = await prisma.refreshToken.findUnique({
+      where: { token: refreshToken },
+    });
+    if (!existingToken)
+      return res.status(401).json({ success: false, message: "Token invalid" });
+
+    const payload = await verifyRefreshToken(refreshToken);
+
+    const userId = payload.userId;
+
+    await prisma.refreshToken.delete({ where: { token: refreshToken } });
+
+    const newRefreshToken = await generateRefreshToken(userId);
+    const expiresAt = new Date();
+    expiresAt.setDate(
+      expiresAt.getDate() + parseInt(env.REFRESH_TOKEN_EXPIRES),
+    );
+
+    await prisma.refreshToken.create({
+      data: {
+        token: newRefreshToken,
+        userId: userId,
+        expiresAt,
+      },
+    });
+
+    const refreshTokenMaxAge = parseInt(
+      ms(parseInt(env.REFRESH_TOKEN_EXPIRES)),
+    );
+
+    const accessToken = await generateAccessToken(userId);
+
+    res
+      .cookie("refreshToken", newRefreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        maxAge: refreshTokenMaxAge,
+      })
+      .json({ success: true, accessToken });
   } catch (err) {
     return res
       .status(500)
@@ -62,11 +146,7 @@ export const signIn = async (req: Request, res: Response) => {
 export const update = async (req: Request, res: Response) => {
   try {
     const id = (req as any).userId;
-    const { name, email } = req.body;
-
-    const dataToUpdate: any = {};
-    if (name) dataToUpdate.name = name;
-    if (email) dataToUpdate.email = email;
+    const dataToUpdate = { ...req.body };
 
     if (req.file) {
       dataToUpdate.photoUrl = `${env.SITE_URL}/uploads/${req.file.filename}`;
@@ -86,6 +166,30 @@ export const update = async (req: Request, res: Response) => {
     return res.status(500).json({
       message: "Internal server error",
       error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
+
+export const signOut = async (req: Request, res: Response) => {
+  try {
+    const id = (req as any).userId;
+
+    const refreshToken = await prisma.refreshToken.findFirst({
+      where: {
+        userId: id,
+      },
+    });
+
+    if (!refreshToken) {
+      return res.status(404).json({
+        message: "Refresh token not found",
+      });
+    }
+
+    return res.status(204);
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal server error",
     });
   }
 };

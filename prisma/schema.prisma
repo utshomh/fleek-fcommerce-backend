@@ -12,11 +12,63 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id String @default(uuid()) @unique
+enum Role {
+  ADMIN
+  USER
+}
 
-  name String
+enum Status {
+  ACTIVE
+  INACTIVE
+}
+
+enum OTPType {
+  EMAIL_VERIFICATION
+  PHONE_VERIFICATION
+  PASSWORD_RESET
+}
+
+model User {
+  id String @id @default(uuid())
+
+  name     String
   password String
   photoUrl String
+  role     Role   @default(USER)
+  status   Status @default(ACTIVE)
+
+  phone Int    @unique
   email String @unique
+
+  isEmailVerified Boolean @default(false)
+  isPhoneVerified Boolean @default(false)
+
+  refreshTokens RefreshToken[]
+  otps          OTP[]
+
+  createdAt DateTime @default(now())
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model OTP {
+  id        String   @id @default(uuid())
+  code      String
+  userId    String
+  type      OTPType
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
 }
