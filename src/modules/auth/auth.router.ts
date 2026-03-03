@@ -10,7 +10,7 @@ import {
   update,
 } from "./auth.controller";
 import { signInSchema, signUpSchema } from "./auth.schema";
-import { authenticate } from "../../middleware/authenticate";
+import { authenticate, requireAdmin } from "../../middleware/authenticate";
 import upload from "../../middleware/upload";
 
 const router = Router();
@@ -20,6 +20,6 @@ router.post("/sign-in", validate(signInSchema), signIn);
 router.patch("/update", authenticate, upload.single("photo"), update);
 router.post("/refresh", refresh);
 router.get("/me", authenticate, me);
-router.post("/sign-in", validate, signOut);
+router.post("/sign-out", validate, signOut);
 
 export default router;
