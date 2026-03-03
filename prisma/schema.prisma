@@ -37,7 +37,7 @@ model User {
   role     Role   @default(USER)
   status   Status @default(ACTIVE)
 
-  phone Int    @unique
+  phone String @unique
   email String @unique
 
   isEmailVerified Boolean @default(false)

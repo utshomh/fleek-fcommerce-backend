@@ -14,11 +14,21 @@ import {
 export const signUp = async (req: Request, res: Response) => {
   const { name, email, phone, password } = req.body;
   try {
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing)
+    const existingEmail = await prisma.user.findUnique({
+      where: { email },
+    });
+    if (existingEmail)
       return res
         .status(400)
         .json({ success: false, message: "Email already in use" });
+
+    const existingPhone = await prisma.user.findUnique({
+      where: { phone },
+    });
+    if (existingPhone)
+      return res
+        .status(400)
+        .json({ success: false, message: "Phone number already in use" });
 
     const hashed = await hashPassword(password);
 
@@ -34,6 +44,8 @@ export const signUp = async (req: Request, res: Response) => {
 
     res.json({ success: true, userId: user.id });
   } catch (err) {
+    console.error(err);
+
     return res
       .status(500)
       .json({ success: false, message: "Internal server error" });
