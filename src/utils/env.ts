@@ -6,6 +6,8 @@ dotenv.config();
 const envSchema = z.object({
   PORT: z.string(),
 
+  SITE_URL: z.string(),
+
   DATABASE_URL: z.string(),
 
   ACCESS_TOKEN_EXPIRES: z.string(),

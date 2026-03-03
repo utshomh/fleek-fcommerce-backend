@@ -6,6 +6,7 @@ import {
   comparePassword,
   generateAccessToken,
 } from "../../utils/auth";
+import env from "../../utils/env";
 
 export const signUp = async (req: Request, res: Response) => {
   const { name, email, password } = req.body;
@@ -55,6 +56,37 @@ export const signIn = async (req: Request, res: Response) => {
     return res
       .status(500)
       .json({ success: false, message: "Internal server error" });
+  }
+};
+
+export const update = async (req: Request, res: Response) => {
+  try {
+    const id = (req as any).userId;
+    const { name, email } = req.body;
+
+    const dataToUpdate: any = {};
+    if (name) dataToUpdate.name = name;
+    if (email) dataToUpdate.email = email;
+
+    if (req.file) {
+      dataToUpdate.photoUrl = `${env.SITE_URL}/uploads/${req.file.filename}`;
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: dataToUpdate,
+    });
+
+    return res.status(200).json({
+      message: "User updated successfully",
+      data: updatedUser,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Internal server error",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
   }
 };
 
